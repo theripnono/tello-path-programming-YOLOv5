@@ -1,10 +1,17 @@
 import pygame
-from pygame.locals import *
 import time
+from pygame.locals import *
+from djitellopy import Tello
 
 # Initialize Pygame
 pygame.init()
 
+# Initialize Tello drone
+tello = Tello()
+
+
+# Set up a delay to ensure a stable connection
+time.sleep(2)
 # Set up the window
 window_width, window_height = 500, 500
 window = pygame.display.set_mode((window_width, window_height))
@@ -41,6 +48,11 @@ while running:
                     animate_dot = True
                     dot_index = 0
                     last_move_time = time.time()
+
+                    tello.connect()
+                    # Set up a delay to ensure a stable connection
+                    time.sleep(2)
+                    tello.takeoff()
             elif event.key == K_a:
                 start_pos[0] -= 10
                 path.append(tuple(start_pos))
@@ -53,6 +65,8 @@ while running:
             elif event.key == K_s:
                 start_pos[1] += 10
                 path.append(tuple(start_pos))
+            elif event.key == K_q:
+                tello.land()
 
     # Draw the window and circle
     window.fill((255, 255, 255))
@@ -77,11 +91,16 @@ while running:
                     dot_pos = list(target_pos)
                     dot_index += 1
                     print(dot_index,dot_pos)
+                    # Move the Tello drone based on the dot's position
+                    tello.move_forward(20)
+                    time.sleep(0.5)
+                    # Adjust the distance as needed
+                    print("TELLO SE MUEVE")
                 last_move_time = time.time()
 
         pygame.draw.circle(window, BLUE, dot_pos, 3)
 
-    # Update the display
+    # Update the displayQ
     pygame.display.update()
 
 # Print the path coordinates
@@ -91,3 +110,6 @@ for coord in path:
 
 # Quit Pygame
 pygame.quit()
+
+# Disconnect from the Tello drone
+tello.disconnect()
