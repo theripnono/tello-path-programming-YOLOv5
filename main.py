@@ -1,86 +1,63 @@
 import pygame
-from djitellopy import Tello
+from pygame.locals import *
 
 # Initialize Pygame
 pygame.init()
 
-# Set the dimensions of the window
-width, height = 50, 50
-window_size = (width, height)
+# Set up the window
+window_width, window_height = 500, 500
+window = pygame.display.set_mode((window_width, window_height))
+pygame.display.set_caption("Draw Path")
 
-# Create the window
-window = pygame.display.set_mode(window_size)
+# Set up colors
+RED = (255, 0, 0)
 
-# Set the initial line start position
-line_start = None
+# Set up the starting position
+start_pos = [window_width // 2, window_height // 2]
 
-# Store the drawn paths
-paths = []
+# Set up variables for tracking path
+path = []
+drawing = False
 
-# Define the key codes for drawing
-draw_keys = [pygame.K_a, pygame.K_s, pygame.K_d, pygame.K_f]
-
-# Initialize the Tello drone
-tello = Tello()
-
-# Connect to the Tello drone
-tello.connect()
-
-# Game loop
+# Main game loop
 running = True
 while running:
     # Handle events
     for event in pygame.event.get():
-        if event.type == pygame.QUIT:
+        if event.type == QUIT:
             running = False
+        elif event.type == KEYDOWN:
+            if event.key == K_RETURN:
+                for coord in path:
+                    print(coord)
+            elif event.key == K_a:
+                start_pos[0] -= 10
+                path.append(tuple(start_pos))
+            elif event.key == K_d:
+                start_pos[0] += 10
+                path.append(tuple(start_pos))
+            elif event.key == K_w:
+                start_pos[1] -= 10
+                path.append(tuple(start_pos))
+            elif event.key == K_s:
+                start_pos[1] += 10
+                path.append(tuple(start_pos))
 
-        elif event.type == pygame.KEYDOWN:
-            if event.key in draw_keys:
-                # Set the line start position when the draw key is pressed
-                line_start = pygame.mouse.get_pos()
-
-        elif event.type == pygame.KEYUP:
-            if event.key in draw_keys and line_start is not None:
-                # Draw the line when the draw key is released
-                line_end = pygame.mouse.get_pos()
-                paths.append((line_start, line_end))
-                line_start = None
-
-    # Fill the window with a color (white in this case)
+    # Draw the window and circle
     window.fill((255, 255, 255))
+    pygame.draw.circle(window, RED, start_pos, 5)
 
-    # Draw the stored paths
-    for path in paths:
-        pygame.draw.line(window, (0, 0, 0), path[0], path[1], 1)
-
-    # Process the stored paths and send commands to the Tello drone
-    for path in paths:
-        start_pos, end_pos = path
-
-        dx = end_pos[0] - start_pos[0]
-        dy = end_pos[1] - start_pos[1]
-
-        # Example drone movement commands
-        if dx > 0:
-            tello.move_right(100)
-        elif dx < 0:
-            tello.move_left(100)
-
-        if dy > 0:
-            tello.move_forward(100)
-        elif dy < 0:
-            tello.move_back(100)
-
-        # Example rotation command
-        tello.rotate_counter_clockwise(90)
-
-        # Add additional commands based on your requirements
+    # Draw the path
+    if len(path) >= 2:
+        pygame.draw.lines(window, RED, False, path, 2)
 
     # Update the display
-    pygame.display.flip()
+    pygame.display.update()
 
-# Disconnect from the Tello drone
-tello.disconnect()
+# Print the path coordinates
+print("Path coordinates:")
+for coord in path:
+    print(coord)
 
 # Quit Pygame
 pygame.quit()
