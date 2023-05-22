@@ -1,7 +1,6 @@
-import pygame
-import time
-import math
+import pygame, time, torch, math, cv2, pandas as pd, base64, os, numpy as np
 from pygame.locals import *
+from datetime import datetime
 from djitellopy import Tello
 
 # Initialize Pygame
@@ -9,7 +8,9 @@ pygame.init()
 
 # Initialize Tello drone
 tello = Tello()
-
+print(torch.cuda.is_available())
+print(torch.version.cuda)
+print('__CUDA VERSION', )
 # Set up a delay to ensure a stable connection
 time.sleep(1)
 
@@ -79,6 +80,57 @@ triangle_rotation2 = 0
 for_loop_finished = False
 # Main loop
 running = True
+
+#Get exported data in folders
+path_export = r"C:\Users\Theri\Escritorio\Drone_Github\images_from_dron"
+export_path = r"C:\Users\Theri\Escritorio\Drone_Github\exported_data"
+
+model = torch.hub.load(r'C:\Users\Theri\Escritorio\pathplanningdron\yolov5','custom',
+                       path=r"C:\Users\Theri\Escritorio\pathplanningdron\best.pt", source = "local")  # load silently)
+
+model.conf = 0.2 #NMS confidence threshold
+model.iou = 0.7  # NMS IoU threshold
+saved_data = []
+
+def video_recorder():
+    img_drone = tello.get_frame_read().frame
+    img_drone = cv2.resize(img_drone, (416, 416))
+
+    # modelo
+    detect = model(img_drone)
+    img_drone = np.squeeze(detect.render())  # bbox of detected objects
+
+    for index, row in detect.pandas().xyxy[0].iterrows():  # iterate over the modelo output
+        x1 = int(row["xmin"])
+        y1 = int(row["ymin"])
+        x2 = int(row["xmax"])
+        y2 = int(row["ymax"])
+        # center of BB
+        x_center, y_center = ((x1 + x2) / 2, (y1 + y2) / 2)
+        center_point = (x_center, y_center)
+
+        name = str(row["name"])
+        accuracy = float(round(row["confidence"], 4))
+        timestamp = datetime.now()
+
+        if accuracy >= 0.7:
+                take_frame = tello.get_frame_read().frame
+                take_frame = cv2.resize(take_frame, (416, 416))
+                encoded_frame = base64.b64encode(
+                    cv2.imencode('.jpg', take_frame)[1]).decode()  # formato para luego
+
+                # poder visualizar las imagenes en el dataframe
+                cv2.imwrite(os.path.join(path_export, f'{name}{accuracy}' + '.png'), take_frame)
+                saved_data.append([x1, y1, x2, y2, center_point, name,
+                                   accuracy, timestamp, encoded_frame])
+    cv2.imshow("drone", img_drone)
+
+    df = pd.DataFrame(columns=["Xmin", "Ymin", "Xmax", "Ymax", "box_center", "predict_name",
+                               "accuracy", "date", "pitures", "coordenates"], data=saved_data)
+    df.to_csv(os.path.join(export_path, 'data' + f'{timestamp.strftime("%m-%d-%Y")}' + '.csv'), encoding='utf-8',
+              sep=",")
+
+
 while running:
     # Handle events
     for event in pygame.event.get():
@@ -87,11 +139,12 @@ while running:
         elif event.type == KEYDOWN:
             if event.key == K_RETURN:
                 if len(path) > 0:
+                    tello.connect()
+                    #tello.takeoff()  # Set up a delay to ensure a stable connection
                     animate_dot = True
                     dot_index = 0
                     last_move_time = time.time()
-                    #tello.connect()
-                    # tello.takeoff() # Set up a delay to ensure a stable connection
+
             elif event.key == K_UP:
                 start_pos[1] -= 10
                 path.append(tuple(start_pos))
@@ -157,47 +210,46 @@ while running:
 
     # Animate the dron path along the red path
     if animate_dot:
-
-
         """
         To track the path I pass the given instructions that I have append before
         Start moving dron automatically
         """
         if dot_index < len(letter_path):
+            video_recorder()
             l = letter_path[dot_index]
             if l == 'up':
-                #tello.move_forward()
-                time.sleep(.5)
+                #tello.move_forward(40)
+                time.sleep(.2)
                 start_pos2[1] -= 10
                 draw_path.append(tuple(start_pos2))
                 print("UP")
             elif l == 'down':
-                #tello.move_back()
+                #tello.move_back(40)
                 start_pos2[1] += 10
                 draw_path.append(tuple(start_pos2))
-                time.sleep(.5)
+                time.sleep(.2)
                 print("donw")
             elif l == 'left':
-                # tello.move_left()
+                #tello.move_forward(40)
                 start_pos2[0] -= 10
                 draw_path.append(tuple(start_pos2))
                 time.sleep(.5)
                 print("left")
             elif l == 'right':
-                # tello.move_right()
+                #tello.move_forward(40)
                 start_pos2[0] += 10
                 draw_path.append(tuple(start_pos2))
-                time.sleep(.5)
+                time.sleep(.2)
                 print("right")
 
             elif l == 'a':
                 triangle_rotation2 -= 90
                 #tello.rotate_clockwise(-90)
-
+                time.sleep(.2)
             elif l == 'd':
                 triangle_rotation2 += 90
                 #tello.rotate_clockwise(90)
-
+                time.sleep(.2)
             dot_index +=1
 
             # Update the triangle coordinates based on the new start_pos
@@ -230,4 +282,4 @@ while running:
 pygame.quit()
 
 # Disconnect from the Tello drone
-#tello.disconnect()
+tello.disconnect()
