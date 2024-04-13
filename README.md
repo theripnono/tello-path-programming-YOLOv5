@@ -1,4 +1,4 @@
-# Yolov5 in a Tello  
+# Yolov5 in streaming in a Tello Drone
 
 This repository consists of two main things:
 
